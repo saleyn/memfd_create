@@ -130,19 +130,16 @@ int main (int argc, char **argv) {
 
   size_t size;
 
-  // First load the image of the so file into memory
-  // and associate it with a file descriptor.  Any
-  // other method to get the file could be used here:
+  // First load the image of the so file into memory.
+  // Any other method to get the file could be used here:
   // get a file from an Internet resource, from a zip
   // file, etc.
   void* mem = load_file(argv[1], &size);
 
-  int shm_fd;
-
   // This is the actual so loader from memory
   void* handle = dlopen_mem(mem, size);
   if (!handle)
-    exit(3);
+    exit(2);
 
   printf("Shared object loaded from memory\n");
 
@@ -153,7 +150,7 @@ int main (int argc, char **argv) {
   if (!sym || dlerror()) {
     fprintf(stderr, "Cannot find entry point '%s' in memory: %s", fun, dlerror());
     dlclose(handle);
-    exit(2);
+    exit(3);
   }
 
   // Execute the function!!!
@@ -162,7 +159,6 @@ int main (int argc, char **argv) {
   printf("SO function returned %d\n", n);
 
   dlclose(handle);
-  close(shm_fd);
 
   if (n != 123)
     fprintf(stderr, "Invalid function return. Expected: 123. Got: %d\n", n);

@@ -1,5 +1,7 @@
 ## Loading shared object files from memory
 
+[![build](https://github.com/saleyn/memfd_create/actions/workflows/test.yaml/badge.svg)](https://github.com/saleyn/memfd_create/actions/workflows/test.yaml)
+
 Typically shared objects are loaded from a file system using `dlopen(2)`.
 
 This project illustrates how to load shared object from memory using
