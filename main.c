@@ -72,7 +72,8 @@ void* load_file(char* filename, size_t* size) {
 }
 
 // Load a shared object from memory and associate it with a shm_fd file descriptor.
-// This file descriptor will need to be closed when done using shared memory object.
+// The return is a handle to the shared memory object that is returned by the
+// dlopen(2) function call.
 //
 // filename - filename to associate with a temporary in-memory file (can be NULL)
 // mem      - memory containing the shared object image
