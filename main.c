@@ -76,10 +76,13 @@ void* dlopen_mem(const char* filename, void* mem, size_t size) {
   char path[512];
   char shm_name[512];
 
+  static int kernel_ver = 0;
+
   path[0]     = '\0';
   shm_name[0] = '\0';
 
-  int kernel_ver = get_kernel_version();
+  if (kernel_ver == 0)
+    kernel_ver = get_kernel_version();
   if (kernel_ver < 0) {
     fprintf(stderr, "Could not determine kernel version\n");
     return NULL;
