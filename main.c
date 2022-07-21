@@ -14,16 +14,10 @@
 #include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <unistd.h>
-#include <asm/unistd.h>
-
-// See: /usr/include/asm-generic/unistd.h
-#ifndef __NR_memfd_create
-#define __NR_memfd_create 319
-#endif
 
 // Wrapper for memfd_create syscall
 inline int memfd_create(const char *name, unsigned int flags) {
-  return syscall(__NR_memfd_create, name, flags);
+  return syscall(SYS_memfd_create, name, flags);
 }
 
 // Returns: XYY kernel version, where X is major, and YY is minor (e.g. 317)
@@ -79,8 +73,11 @@ void* load_file(char* filename, size_t* size) {
 // mem      - memory containing the shared object image
 // size     - size of the mem
 void* dlopen_mem(const char* filename, void* mem, size_t size) {
-  char  path[512];
-  char  shm_name[512];
+  char path[512];
+  char shm_name[512];
+
+  path[0]     = '\0';
+  shm_name[0] = '\0';
 
   int kernel_ver = get_kernel_version();
   if (kernel_ver < 0) {
@@ -89,18 +86,20 @@ void* dlopen_mem(const char* filename, void* mem, size_t size) {
   }
 
   // Create some random shared memory file name
-  if (!filename) {
+  if (!filename || kernel_ver < 317) {
     struct timeval tv;
     gettimeofday(&tv,NULL);
 
-    snprintf(shm_name, sizeof(shm_name), "memfd-%ld", 1000000L * tv.tv_sec + tv.tv_usec);
+    snprintf(shm_name, sizeof(shm_name), "memfd-%ld.so", 1000000L * tv.tv_sec + tv.tv_usec);
     filename = shm_name;
   }
 
+  void* handle = NULL;
+
   // Get a file descriptor with a filename saved to `path`,
   // where a shared object can be written to in memory
-  // suitable for a later call to dlopen. For Linux kernels < 317
-  // set the path to the name of a shared memory file.
+  // suitable for a later call to dlopen(2). For Linux kernels < 317
+  // use the shm_open(2) function.
   // TODO: Generate temporary file name instead of using SHM_NAME
   int shm_fd = kernel_ver >= 317
              ? memfd_create(filename, 1)
@@ -108,7 +107,7 @@ void* dlopen_mem(const char* filename, void* mem, size_t size) {
 
   if (shm_fd < 0) {
     fprintf(stderr, "Could not create mem file descriptor: (%d) %s\n", errno, strerror(errno));
-    return NULL;
+    goto ERR;
   }
 
   if (kernel_ver >= 317)
@@ -119,17 +118,18 @@ void* dlopen_mem(const char* filename, void* mem, size_t size) {
   if (write(shm_fd, mem, size) < 0) {
     fprintf(stderr, "Could not write %ld bytes to mem file: (%d) %s\n",
       size, errno, strerror(errno));
-    close(shm_fd);
-    return NULL;
+    goto ERR;
   }
 
-  void* handle = dlopen(path, RTLD_LAZY);
+  handle = dlopen(path, RTLD_LAZY);
   if (!handle)
     fprintf(stderr,"Error in dlopen: %s\n", dlerror());
 
-  close(shm_fd);
-  unlink(path);
-
+ERR:
+  if (shm_fd >= 0)
+    close(shm_fd);
+  if (path[0]     != '\0') unlink(path);
+  if (shm_name[0] != '\0') unlink(shm_name);
   return handle;
 }
 
